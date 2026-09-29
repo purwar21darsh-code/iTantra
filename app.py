@@ -315,6 +315,18 @@ def receiver():     return render_template('receiver.html')
 @app.route('/admin')
 def admin():        return render_template('admin.html')
 
+# ---- SOLO DEMO (single-device, judge-safe) --------------------------------
+@app.route('/solo')
+def solo():
+    """Single-device SOLO DEMO: Phone A + Phone B side-by-side.
+    Used when judges run the prototype alone without two phones."""
+    return render_template('solo.html')
+
+@app.route('/solo_embed')
+def solo_embed():
+    """Compact version embedded inside /solo iframes."""
+    return render_template('solo_embed.html')
+
 @app.route('/static/<path:p>')
 def static_files(p):
     return send_from_directory(STATIC_DIR, p)
@@ -624,7 +636,7 @@ def print_banner():
     print('  iTANTRA — Offline Neural Transceiver')
     print('  SIH 2026 · Problem Statement 173')
     print('=' * 66)
-    print(f'  LOCAL SERVER   http://{ip}:8000')
+    print(f'  SOLO DEMO      http://{ip}:8000/solo')
     print(f'  ADMIN          http://{ip}:8000/admin')
     print(f'  Phone A        http://{ip}:8000/transmitter')
     print(f'  Phone B        http://{ip}:8000/receiver')
@@ -642,5 +654,7 @@ def print_banner():
     print()
 
 if __name__ == '__main__':
+    # Allow PORT override for cloud platforms (Render sets this env var)
+    port = int(os.environ.get('PORT', 8000))
     print_banner()
-    app.run(host='0.0.0.0', port=8000, debug=False, threaded=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True, use_reloader=False)

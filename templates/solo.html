@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>iTANTRA — SOLO DEMO (Single Device)</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .solo-header { text-align:center; padding:14px 16px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#0b141d,#070c12); position:sticky; top:0; z-index:30; }
+  .solo-title { font-size:24px; letter-spacing:.24em; color:#fff;
+    text-shadow:0 0 14px rgba(0,229,160,.55); font-weight:700; }
+  .solo-sub { font-size:10px; letter-spacing:.3em; color:var(--accent); margin-top:4px; }
+  .solo-hint { font-size:11px; color:var(--text-dim); margin-top:8px; letter-spacing:.12em; }
+  .solo-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px;
+    max-width:1400px; margin:12px auto; padding:0 12px; }
+  .solo-frame { border:1px solid var(--line); border-radius:6px;
+    background:#060a0e; overflow:hidden; display:flex; flex-direction:column; }
+  .solo-frame-title { padding:8px 12px; font-size:11px; letter-spacing:.25em;
+    border-bottom:1px solid var(--line); }
+  .solo-frame-title.a { color:var(--accent); }
+  .solo-frame-title.b { color:var(--accent-2); }
+  .solo-frame iframe { width:100%; height:82vh; border:0; background:#060a0e; flex:1; }
+  @media (max-width:900px) { .solo-grid { grid-template-columns:1fr; }
+    .solo-frame iframe { height:72vh; } }
+  .steps { max-width:1200px; margin:8px auto 24px; padding:12px 20px;
+    border:1px solid var(--line); border-radius:6px; background:#0a1018;
+    font-size:12px; line-height:1.9; letter-spacing:.08em; color:var(--text-dim); }
+  .steps b { color:var(--accent); }
+  .steps .num { color:var(--accent); font-weight:700; margin-right:8px; }
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="solo-header">
+  <div class="solo-title">iTANTRA</div>
+  <div class="solo-sub">SINGLE-DEVICE SOLO DEMO · FULL PIPELINE</div>
+  <div class="solo-hint">PHONE A (left) → OFFLINE STT → TEXT PACKET → PHONE B (right) → OFFLINE TTS</div>
+</div>
+<div class="steps">
+  <span class="num">1.</span> LEFT panel: pick <b>Hindi</b> or <b>English</b>, then tap <b>PRESS TO SPEAK</b> (or a DEMO button).<br>
+  <span class="num">2.</span> Recognized text appears on the LEFT. Tap <b>SEND TEXT PACKET</b>.<br>
+  <span class="num">3.</span> RIGHT panel receives the text and plays the offline TTS audio.<br>
+  <span class="num">4.</span> Latency + payload-reduction numbers update on both sides.
+</div>
+<div class="solo-grid">
+  <div class="solo-frame">
+    <div class="solo-frame-title a">PHONE A · TRANSMITTER</div>
+    <iframe src="/solo_embed?role=transmitter"></iframe>
+  </div>
+  <div class="solo-frame">
+    <div class="solo-frame-title b">PHONE B · RECEIVER</div>
+    <iframe src="/solo_embed?role=receiver"></iframe>
+  </div>
+</div>
+<script>
+setInterval(async () => {
+  try {
+    await fetch('/api/heartbeat', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({device:'phone_a', role:'transmitter'})});
+    await fetch('/api/heartbeat', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({device:'phone_b', role:'receiver'})});
+  } catch(e){}
+}, 2500);
+</script>
+</body>
+</html>

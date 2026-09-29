@@ -179,3 +179,15 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# iTANTRA specific
+.venv/
+__pycache__/
+*.pyc
+cloudflared.exe
+iTANTRA_JUDGE_READY.zip
+uploads/*
+!uploads/.gitkeep
+generated_audio/*
+!generated_audio/.gitkeep
+data/messages.json

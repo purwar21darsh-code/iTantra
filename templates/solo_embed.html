@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>iTANTRA — Embedded</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { padding-bottom: 8px; }
+  .hud { position: static; }
+  .screen { padding: 10px; gap: 10px; }
+  .embed-note { text-align:center; font-size:10px; letter-spacing:.2em;
+    color:var(--warn); padding:6px; border:1px dashed rgba(255,176,0,.4);
+    border-radius:4px; margin:6px 12px 0; }
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="embed-note">SOLO DEMO · THIS PANEL IS EMBEDDED</div>
+<header class="hud">
+  <div class="hud-left">
+    <div class="hud-title" style="font-size:16px">iTANTRA</div>
+    <div class="hud-sub" id="roleSub">—</div>
+  </div>
+  <div class="hud-right">
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">LINKING…</span></div>
+    <div class="hud-role" id="roleTag">—</div>
+  </div>
+</header>
+<main class="screen" id="viewT" style="display:none">
+  <section class="panel">
+    <div class="panel-title">LANGUAGE</div>
+    <select id="langSelect" class="lang-select"></select>
+    <div class="lang-note" id="langNote"></div>
+  </section>
+  <section class="panel alert-panel">
+    <div class="panel-title danger">PRIORITY ALERT</div>
+    <div class="alert-buttons" id="alertButtons"></div>
+  </section>
+  <section class="panel ptt-panel" style="padding:16px">
+    <input type="file" accept="audio/*" capture="microphone" id="audioInput" style="display:none">
+    <button class="ptt-btn" id="pttBtn" style="width:140px;height:140px;font-size:13px">PRESS TO SPEAK</button>
+    <div class="ptt-state" id="pttState">READY</div>
+  </section>
+  <section class="panel hidden" id="recognizedPanel">
+    <div class="panel-title">RECOGNIZED MESSAGE</div>
+    <div class="big-text" id="recognizedText" style="font-size:16px">—</div>
+    <div class="meta" id="recognizedMeta"></div>
+    <button class="btn-primary big" id="sendBtn">SEND TEXT PACKET</button>
+  </section>
+  <section class="panel hidden" id="sentPanel">
+    <div class="panel-title ok">TEXT PACKET SENT</div>
+    <div class="kv"><span>Packet size</span><b id="pkBytes">—</b></div>
+    <div class="kv"><span>Timestamp</span><b id="pkTime">—</b></div>
+    <div class="kv"><span>TTS engine</span><b id="pkEngine">—</b></div>
+  </section>
+  <section class="panel">
+    <div class="panel-title warn">DEMO / FALLBACK MODE</div>
+    <div class="demo-buttons">
+      <button class="btn-demo" data-demo="Communication test successful.">EN · Communication test successful.</button>
+      <button class="btn-demo" data-demo="हम सुरक्षित हैं और आगे बढ़ रहे हैं।">HI · हम सुरक्षित हैं और आगे बढ़ रहे हैं।</button>
+      <button class="btn-demo" data-demo="हम सुरक्षित हैं">HI · हम सुरक्षित हैं</button>
+    </div>
+  </section>
+  <section class="panel">
+    <div class="panel-title">COMMUNICATION ANALYTICS</div>
+    <div class="kv"><span>Original Audio</span><b id="anAudio">—</b></div>
+    <div class="kv"><span>Transmitted Text</span><b id="anText">—</b></div>
+    <div class="kv"><span>Payload Reduction</span><b id="anRed">—</b></div>
+  </section>
+  <section class="panel">
+    <div class="panel-title">LATENCY</div>
+    <div class="kv"><span>STT</span><b id="ltStt">—</b></div>
+    <div class="kv"><span>Text Delivery</span><b id="ltNet">—</b></div>
+    <div class="kv"><span>TTS</span><b id="ltTts">—</b></div>
+    <div class="kv total"><span>TOTAL</span><b id="ltTotal">—</b></div>
+  </section>
+</main>
+<main class="screen" id="viewR" style="display:none">
+  <div class="alert-banner hidden" id="alertBanner" style="font-size:12px;padding:8px">PRIORITY ALERT</div>
+  <section class="panel incoming-panel" id="incomingPanel">
+    <div class="panel-title">INCOMING MESSAGE</div>
+    <div class="big-text" id="incomingText" style="font-size:16px">—</div>
+    <div class="meta" id="incomingMeta"></div>
+    <div class="tts-state" id="ttsState">WAITING FOR MESSAGE…</div>
+    <audio id="audioPlayer" controls style="display:none;width:100%;margin-top:10px"></audio>
+    <button class="btn-primary big hidden" id="playBtn">PLAY MESSAGE</button>
+  </section>
+  <section class="panel">
+    <div class="panel-title">LATENCY</div>
+    <div class="kv"><span>STT</span><b id="rLtStt">—</b></div>
+    <div class="kv"><span>Text Delivery</span><b id="rLtNet">—</b></div>
+    <div class="kv"><span>TTS</span><b id="rLtTts">—</b></div>
+    <div class="kv total"><span>TOTAL</span><b id="rLtTotal">—</b></div>
+  </section>
+  <section class="panel">
+    <div class="panel-title">COMMUNICATION ANALYTICS</div>
+    <div class="kv"><span>Original Audio</span><b id="rAnAudio">—</b></div>
+    <div class="kv"><span>Transmitted Text</span><b id="rAnText">—</b></div>
+    <div class="kv"><span>Payload Reduction</span><b id="rAnRed">—</b></div>
+  </section>
+  <section class="panel">
+    <div class="panel-title">MESSAGE HISTORY</div>
+    <div class="history" id="history">—</div>
+  </section>
+</main>
+<script>
+(function(){
+  const role = new URLSearchParams(location.search).get('role') || 'transmitter';
+  document.getElementById('roleTag').textContent = role === 'transmitter' ? 'PHONE A · TRANSMITTER' : 'PHONE B · RECEIVER';
+  document.getElementById('roleSub').textContent = role === 'transmitter' ? 'OFFLINE TRANSCEIVER' : 'OFFLINE RECEIVER';
+  document.getElementById('viewT').style.display = role === 'transmitter' ? 'flex' : 'none';
+  document.getElementById('viewR').style.display = role === 'receiver'    ? 'flex' : 'none';
+  const devName = role === 'transmitter' ? 'phone_a' : 'phone_b';
+
+  async function hb(){
+    try{
+      await fetch('/api/heartbeat',{method:'POST',headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({device: devName, role: role})});
+      const r = await fetch('/api/status'); const j = await r.json();
+      const dot = document.getElementById('dot');
+      const txt = document.getElementById('statusText');
+      const both = j.phone_a_connected && j.phone_b_connected;
+      if (both) { dot.className='dot ok'; txt.textContent='CONNECTED'; }
+      else      { dot.className='dot warn'; txt.textContent='LINKING…'; }
+    }catch(e){}
+  }
+  hb(); setInterval(hb, 2500);
+
+  if (role === 'transmitter'){
+    const S = {language:'hi', originalBytes:0, sttMs:null, lastText:''};
+
+    (async ()=>{
+      const r = await fetch('/api/languages'); const j = await r.json();
+      const sel = document.getElementById('langSelect');
+      j.languages.forEach(l=>{
+        const o=document.createElement('option');
+        o.value=l.code; o.textContent=l.name+' — '+l.stt;
+        if(l.code===S.language) o.selected=true;
+        sel.appendChild(o);
+      });
+      sel.onchange = ()=>{
+        S.language = sel.value;
+        const cur = j.languages.find(l=>l.code===S.language);
+        const n = document.getElementById('langNote');
+        n.textContent = cur.stt==='READY' ? 'Offline STT ready.' : 'Model required — use DEMO MODE';
+        n.className = 'lang-note ' + (cur.stt==='READY'?'ok':'warn');
+        hb();
+      };
+      sel.onchange();
+    })();
+
+    (async ()=>{
+      const r = await fetch('/api/alerts'); const j = await r.json();
+      const box = document.getElementById('alertButtons');
+      j.alerts.forEach(txt=>{
+        const b=document.createElement('button');
+        b.className='btn-alert'; b.textContent=txt;
+        b.onclick=()=>sendPacket(txt,true,true);
+        box.appendChild(b);
+      });
+    })();
+
+    const pttBtn=document.getElementById('pttBtn');
+    const pttState=document.getElementById('pttState');
+    const audioInput=document.getElementById('audioInput');
+    pttBtn.onclick=()=>audioInput.click();
+    audioInput.onchange=async()=>{
+      const f=audioInput.files && audioInput.files[0]; if(!f) return;
+      pttState.textContent='PROCESSING…'; pttBtn.disabled=true;
+      const fd=new FormData(); fd.append('audio',f); fd.append('language',S.language);
+      try{
+        const r=await fetch('/api/transcribe',{method:'POST',body:fd});
+        const j=await r.json();
+        if(!j.ok){ pttState.textContent='FAILED: '+(j.error||''); pttBtn.disabled=false; return; }
+        S.originalBytes=j.original_bytes||0; S.sttMs=j.stt_ms; S.lastText=j.text;
+        document.getElementById('recognizedText').textContent=j.text;
+        document.getElementById('recognizedMeta').textContent =
+          'Audio: '+(j.original_kb||'?')+' KB · STT: '+(j.stt_ms!=null?j.stt_ms.toFixed(0)+' ms':'—');
+        document.getElementById('recognizedPanel').classList.remove('hidden');
+        document.getElementById('sentPanel').classList.add('hidden');
+        pttState.textContent='RECOGNIZED'; pttBtn.disabled=false;
+      }catch(e){ pttState.textContent='NETWORK ERROR'; pttBtn.disabled=false; }
+      audioInput.value='';
+    };
+    document.getElementById('sendBtn').onclick=()=>{ if(S.lastText) sendPacket(S.lastText,false,false); };
+    document.querySelectorAll('.btn-demo').forEach(b=>{
+      b.onclick=()=>sendPacket(b.dataset.demo,false,true);
+    });
+    async function sendPacket(text, priority, demo){
+      try{
+        const r=await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({text:text, language:S.language, priority:priority, demo:demo,
+            original_bytes: demo?0:S.originalBytes, stt_ms: demo?null:S.sttMs})});
+        const j=await r.json();
+        if(!j.ok){ alert('Send failed: '+(j.error||'')); return; }
+        const p=j.packet;
+        document.getElementById('pkBytes').textContent=p.bytes+' bytes';
+        document.getElementById('pkTime').textContent=p.time_str;
+        document.getElementById('pkEngine').textContent=p.tts_engine||'UNAVAILABLE';
+        document.getElementById('sentPanel').classList.remove('hidden');
+        document.getElementById('recognizedPanel').classList.add('hidden');
+        document.getElementById('anText').textContent=p.bytes+' bytes';
+        document.getElementById('anAudio').textContent=p.original_kb?(p.original_kb+' KB'):'DEMO';
+        document.getElementById('anRed').textContent=(j.reduction_pct!=null)?(j.reduction_pct+' %'):'—';
+        S.lastText=''; S.originalBytes=0; S.sttMs=null;
+        refreshLat();
+      }catch(e){}
+    }
+    async function refreshLat(){
+      try{
+        const r=await fetch('/api/latency'); const j=await r.json();
+        document.getElementById('ltStt').textContent=j.stt_ms!=null?j.stt_ms.toFixed(0)+' ms':'NOT MEASURED';
+        document.getElementById('ltNet').textContent=j.net_ms!=null?j.net_ms.toFixed(0)+' ms':'NOT MEASURED';
+        document.getElementById('ltTts').textContent=j.tts_ms!=null?j.tts_ms.toFixed(0)+' ms':'NOT MEASURED';
+        document.getElementById('ltTotal').textContent=j.total_ms!=null?j.total_ms.toFixed(0)+' ms':'NOT MEASURED';
+      }catch(e){}
+    }
+    setInterval(refreshLat, 3000); refreshLat();
+  }
+
+  if (role === 'receiver'){
+    let lastSeq=0, polling=false;
+    const audioPlayer=document.getElementById('audioPlayer');
+    const playBtn=document.getElementById('playBtn');
+    async function poll(){
+      if(polling) return; polling=true;
+      try{
+        const r=await fetch('/api/incoming?since='+lastSeq); const j=await r.json();
+        if(j.messages&&j.messages.length){
+          for(const m of j.messages){ show(m); lastSeq=Math.max(lastSeq,m.seq); }
+          refreshHist(); refreshLat();
+        }
+      }catch(e){}
+      polling=false;
+    }
+    setInterval(poll,900);
+    function show(m){
+      document.getElementById('incomingText').textContent=m.text;
+      const bits=[m.time_str+' · PHONE A · '+m.language.toUpperCase()];
+      if(m.demo) bits.push('DEMO');
+      if(m.net_ms!=null) bits.push('delivery '+m.net_ms.toFixed(0)+' ms');
+      document.getElementById('incomingMeta').textContent=bits.join(' · ');
+      document.getElementById('alertBanner').classList.toggle('hidden', m.type!=='priority');
+      const st=document.getElementById('ttsState');
+      const p=document.getElementById('incomingPanel');
+      if(!m.audio_url){
+        st.textContent='TTS UNAVAILABLE — '+(m.tts_error||'');
+        st.className='tts-state err'; audioPlayer.style.display='none';
+        playBtn.classList.add('hidden'); return;
+      }
+      st.textContent='TTS PROCESSING…'; st.className='tts-state';
+      audioPlayer.src=m.audio_url+'?t='+Date.now();
+      audioPlayer.load(); audioPlayer.style.display='block';
+      const pr=audioPlayer.play();
+      if(pr && pr.catch){
+        pr.then(()=>{ st.textContent='PLAYING'; st.className='tts-state ok'; })
+          .catch(()=>{ st.textContent='AUTOPLAY BLOCKED'; st.className='tts-state warn';
+                       playBtn.classList.remove('hidden'); });
+      }
+      p.classList.add('incoming-active');
+      setTimeout(()=>p.classList.remove('incoming-active'),900);
+    }
+    playBtn.onclick=()=>audioPlayer.play().then(()=>{
+      playBtn.classList.add('hidden');
+      document.getElementById('ttsState').textContent='PLAYING';
+      document.getElementById('ttsState').className='tts-state ok';
+    }).catch(()=>{});
+    audioPlayer.onended=()=>{ document.getElementById('ttsState').textContent='PLAYBACK COMPLETE'; };
+    async function refreshLat(){
+      try{
+        const r=await fetch('/api/latency'); const j=await r.json();
+        document.getElementById('rLtStt').textContent=j.stt_ms!=null?j.stt_ms.toFixed(0)+' ms':'NOT MEASURED';
+        document.getElementById('rLtNet').textContent=j.net_ms!=null?j.net_ms.toFixed(0)+' ms':'NOT MEASURED';
+        document.getElementById('rLtTts').textContent=j.tts_ms!=null?j.tts_ms.toFixed(0)+' ms':'NOT MEASURED';
+        document.getElementById('rLtTotal').textContent=j.total_ms!=null?j.total_ms.toFixed(0)+' ms':'NOT MEASURED';
+        document.getElementById('rAnAudio').textContent=j.original_kb!=null?j.original_kb+' KB':'—';
+        document.getElementById('rAnText').textContent=j.text_bytes!=null?j.text_bytes+' bytes':'—';
+        document.getElementById('rAnRed').textContent=j.reduction_pct!=null?j.reduction_pct+' %':'—';
+      }catch(e){}
+    }
+    async function refreshHist(){
+      try{
+        const r=await fetch('/api/history?limit=20'); const j=await r.json();
+        if(!j.messages.length){ document.getElementById('history').textContent='—'; return; }
+        document.getElementById('history').innerHTML = j.messages.slice().reverse().map(m=>
+          '<div class="hist-row'+(m.type==='priority'?' prio':'')+'">'+
+            '<span>'+m.time_str+'</span><span>'+m.sender+'</span>'+
+            '<span>'+m.language.toUpperCase()+'</span>'+
+            '<span class="hist-text">'+esc(m.text)+'</span>'+
+            '<span>'+(m.type==='priority'?'ALERT':'NORMAL')+'</span></div>').join('');
+      }catch(e){}
+    }
+    function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    refreshHist(); refreshLat();
+  }
+})();
+</script>
+</body>
+</html>
