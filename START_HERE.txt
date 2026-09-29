@@ -1,0 +1,22 @@
+============================================================
+  iTANTRA  -  SIH 2026  -  Problem Statement 173
+  JUDGE DEMONSTRATION PACKAGE  (OFFLINE-READY)
+============================================================
+
+  QUICK START
+  -----------
+  1. Extract this ZIP to any folder.
+  2. Double-click  run.bat
+  3. Wait ~30-60 seconds (models are already bundled — no
+     internet needed at all).
+  4. The SOLO DEMO page opens automatically in your browser.
+  5. Follow the numbered steps on the page.
+
+  The SOLO DEMO shows BOTH Phone A and Phone B side-by-side on
+  ONE screen. No second phone required.
+
+  WORKS WITHOUT INTERNET. Works with Wi-Fi off.
+  Full instructions in JUDGE_GUIDE.md.
+
+  Requirements: Windows 10/11 + Python 3.10+ installed.
+============================================================

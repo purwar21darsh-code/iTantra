@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>iTANTRA — Admin / Demo Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="scanlines"></div>
+
+<header class="hud">
+  <div class="hud-left">
+    <div class="hud-title">iTANTRA</div>
+    <div class="hud-sub">LOCAL NETWORK DASHBOARD</div>
+  </div>
+  <div class="hud-right">
+    <div class="hud-role">LAPTOP · ADMIN</div>
+    <div class="hud-role2">SIH 2026 · PS-173 · SCREENING PROTOTYPE</div>
+  </div>
+</header>
+
+<main class="admin-grid">
+
+  <!-- QR -->
+  <section class="panel qr-panel">
+    <div class="panel-title">SCAN TO CONNECT</div>
+    <img class="qr-img" src="/qr.png" alt="QR">
+    <div class="qr-url" id="qrUrl">http://…</div>
+    <div class="qr-hint">Phone A → TRANSMITTER<br>Phone B → RECEIVER</div>
+  </section>
+
+  <!-- NETWORK STATUS -->
+  <section class="panel">
+    <div class="panel-title">LOCAL NETWORK STATUS</div>
+    <div class="kv"><span>Server IP</span><b id="srvIp">—</b></div>
+    <div class="kv"><span>Port</span><b>8000</b></div>
+    <div class="kv"><span>Phone A</span><b id="stA">—</b></div>
+    <div class="kv"><span>Phone B</span><b id="stB">—</b></div>
+    <div class="kv"><span>Messages</span><b id="stMsg">0</b></div>
+  </section>
+
+  <!-- ENGINES -->
+  <section class="panel">
+    <div class="panel-title">ENGINE STATUS</div>
+    <div class="kv"><span>Vosk (STT)</span><b id="engVosk">—</b></div>
+    <div class="kv"><span>pyttsx3 (TTS)</span><b id="engPy">—</b></div>
+    <div class="kv"><span>ffmpeg</span><b id="engFF">—</b></div>
+    <div class="kv"><span>espeak-ng</span><b id="engES">—</b></div>
+  </section>
+
+  <!-- LANGUAGES -->
+  <section class="panel">
+    <div class="panel-title">LANGUAGE STATUS</div>
+    <div class="lang-status-body" id="langBody">—</div>
+  </section>
+
+  <!-- LATENCY -->
+  <section class="panel">
+    <div class="panel-title">LATENCY (LAST MESSAGE)</div>
+    <div class="kv"><span>STT</span><b id="ltStt">NOT MEASURED</b></div>
+    <div class="kv"><span>Text Delivery</span><b id="ltNet">NOT MEASURED</b></div>
+    <div class="kv"><span>TTS</span><b id="ltTts">NOT MEASURED</b></div>
+    <div class="kv total"><span>TOTAL</span><b id="ltTotal">NOT MEASURED</b></div>
+  </section>
+
+  <!-- PAYLOAD -->
+  <section class="panel">
+    <div class="panel-title">PAYLOAD SIZE</div>
+    <div class="kv"><span>Original Audio</span><b id="plAudio">—</b></div>
+    <div class="kv"><span>Text Packet</span><b id="plText

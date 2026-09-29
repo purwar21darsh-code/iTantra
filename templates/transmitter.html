@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>iTANTRA — Transmitter</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="scanlines"></div>
+
+<header class="hud">
+  <div class="hud-left">
+    <div class="hud-title">iTANTRA</div>
+    <div class="hud-sub">OFFLINE TRANSCEIVER</div>
+  </div>
+  <div class="hud-right">
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">LINKING…</span></div>
+    <div class="hud-role">PHONE A · TRANSMITTER</div>
+  </div>
+</header>
+
+<main class="screen">
+
+  <!-- ============ LANGUAGE ============ -->
+  <section class="panel">
+    <div class="panel-title">LANGUAGE</div>
+    <select id="langSelect" class="lang-select"></select>
+    <div class="lang-note" id="langNote"></div>
+  </section>
+
+  <!-- ============ PRIORITY ALERT ============ -->
+  <section class="panel alert-panel">
+    <div class="panel-title danger">PRIORITY ALERT</div>
+    <div class="alert-buttons" id="alertButtons"></div>
+  </section>
+
+  <!-- ============ PTT ============ -->
+  <section class="panel ptt-panel">
+    <input type="file" accept="audio/*" capture="microphone" id="audioInput" style="display:none">
+    <button class="ptt-btn" id="pttBtn">PRESS TO SPEAK</button>
+    <div class="ptt-state" id="pttState">READY</div>
+  </section>
+
+  <!-- ============ RECOGNIZED ============ -->
+  <section class="panel hidden" id="recognizedPanel">
+    <div class="panel-title">RECOGNIZED MESSAGE</div>
+    <div class="big-text" id="recognizedText">—</div>
+    <div class="meta" id="recognizedMeta"></div>
+    <button class="btn-primary big" id="sendBtn">SEND TEXT PACKET</button>
+  </section>
+
+  <!-- ============ PACKET SENT ============ -->
+  <section class="panel hidden" id="sentPanel">
+    <div class="panel-title ok">TEXT PACKET SENT</div>
+    <div class="kv"><span>Packet size</span><b id="pkBytes">—</b></div>
+    <div class="kv"><span>Timestamp</span><b id="pkTime">—</b></div>
+    <div class="kv"><span>TTS engine</span><b id="pkEngine">—</b></div>
+    <button class="btn-secondary big" id="resetBtn">NEW TRANSMISSION</button>
+  </section>
+
+  <!-- ============ DEMO FALLBACK ============ -->
+  <section class="panel">
+    <div class="panel-title warn">DEMO / FALLBACK MODE</div>
+    <div class="demo-hint">Use this only if the microphone or STT fails during a live demo.</div>
+    <div class="demo-buttons">
+      <button class="btn-demo" data-demo="Communication test successful.">EN · "Communication test successful."</button>
+      <button class="btn-demo" data-demo="हम सुरक्षित हैं और आगे बढ़ रहे हैं।">HI · "हम सुरक्षित हैं और आगे बढ़ रहे हैं।"</button>
+      <button class="btn-demo" data-demo="हम सुरक्षित हैं">HI · "हम सुरक्षित हैं"</button>
+    </div>
+  </section>
+
+  <!-- ============ ANALYTICS ============ -->
+  <section class="panel">
+    <div class="panel-title">COMMUNICATION ANALYTICS</div>
+    <div class="kv"><span>Original Audio</span><b id="anAudio">—</b></div>
+    <div class="kv"><span>Transmitted Text</span><b id="anText">—</b></div>
+    <div class="kv"><span>Estimated Payload Reduction</span><b id="anRed">—</b></div>
+    <div class="note">Audio used locally for speech recognition. Inter-device communication payload is text.</div>
+  </section>
+
+  <!-- ============ LATENCY ============ -->
+  <section class="panel">
+    <div class="panel-title">LATENCY</div>
+    <div class="kv"><span>STT</span><b id="ltStt">—</b></div>
+    <div class="kv"><span>Text Delivery</span><b id="ltNet">—</b></div>
+    <div class="kv"><span>TTS</span><b id="ltTts">—</b></div>
+    <div class="kv total"><span>TOTAL</span><b id="ltTotal">—</b></div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section class="panel">
+    <div class="panel-title">MESSAGE HISTORY</div>
+    <div class="history" id="history">—</div>
+  </section>
+
+</main>
+
+<script>
+// ------------------------------------------------------------------
+//  STATE
+// ------------------------------------------------------------------
+const S = {
+  language: 'hi',
+  originalBytes: 0,
+  sttMs: null,
+  lastText: '',
+  langStatus: [],
+};
+
+// ------------------------------------------------------------------
+//  HEARTBEAT  (keeps server knowing we're alive)
+// ------------------------------------------------------------------
+async function heartbeat() {
+  try {
+    await fetch('/api/heartbeat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({device: 'phone_a', language: S.language, role: 'transmitter'})
+    });
+    const r = await fetch('/api/status');
+    const j = await r.json();
+    setConnected(j.phone_a_connected && j.phone_b_connected, j.phone_b_connected);
+  } catch (e) {
+    setConnected(false, false);
+  }
+}
+function setConnected(aOK, bOK) {
+  const dot  = document.querySelector('#status .dot');
+  const txt  = document.getElementById('statusText');
+  if (aOK) {
+    dot.className = 'dot ok';
+    txt.textContent = 'CONNECTED';
+  } else if (bOK) {
+    dot.className = 'dot warn';
+    txt.textContent = 'WAITING FOR PHONE B';
+  } else {
+    dot.className = 'dot';
+    txt.textContent = 'LINKING…';
+  }
+}
+setInterval(heartbeat, 3000); heartbeat();
+
+// ------------------------------------------------------------------
+//  LANGUAGES
+// ------------------------------------------------------------------
+async function loadLanguages() {
+  const r = await fetch('/api/languages');
+  const j = await r.json();
+  S.langStatus = j.languages;
+  const sel = document.getElementById('langSelect');
+  sel.innerHTML = '';
+  j.languages.forEach(l => {
+    const o = document.createElement('option');
+    o.value = l.code;
+    o.textContent = l.name + '  —  ' + l.stt + (l.stt === 'READY' ? '' : ' (fallback: DEMO)');
+    o.disabled = false;
+    if (l.code === S.language) o.selected = true;
+    sel.appendChild(o);
+  });
+  updateLangNote();
+  sel.onchange = () => {
+    S.language = sel.value;
+    updateLangNote();
+    heartbeat();
+  };
+}
+function updateLangNote() {
+  const cur = S.langStatus.find(l => l.code === S.language);
+  const note = document.getElementById('langNote');
+  if (!cur) { note.textContent = ''; return; }
+  note.textContent = cur.stt === 'READY'
+    ? 'Offline STT model loaded for ' + cur.name
+    : 'No STT model installed for ' + cur.name + '. Use DEMO MODE or add models/' + cur.code + '/';
+  note.className = 'lang-note ' + (cur.stt === 'READY' ? 'ok' : 'warn');
+}
+loadLanguages();
+
+// ------------------------------------------------------------------
+//  PRIORITY ALERTS
+// ------------------------------------------------------------------
+(async function () {
+  const r = await fetch('/api/alerts');
+  const j = await r.json();
+  const box = document.getElementById('alertButtons');
+  j.alerts.forEach(txt => {
+    const b = document.createElement('button');
+    b.className = 'btn-alert';
+    b.textContent = txt;
+    b.onclick = () => sendPacket(txt, true, true);
+    box.appendChild(b);
+  });
+})();
+
+// ------------------------------------------------------------------
+//  PTT  (audio upload → /api/transcribe)
+// ------------------------------------------------------------------
+const pttBtn   = document.getElementById('pttBtn');
+const pttState = document.getElementById('pttState');
+const audioInput = document.getElementById('audioInput');
+
+pttBtn.onclick = () => audioInput.click();
+
+audioInput.onchange = async () => {
+  const f = audioInput.files && audioInput.files[0];
+  if (!f) return;
+  pttState.textContent = 'PROCESSING…';
+  pttBtn.disabled = true;
+
+  const fd = new FormData();
+  fd.append('audio', f);
+  fd.append('language', S.language);
+
+  try {
+    const r = await fetch('/api/transcribe', {method: 'POST', body: fd});
+    const j = await r.json();
+
+    if (!j.ok) {
+      pttState.textContent = 'FAILED: ' + (j.error || 'unknown error');
+      pttBtn.disabled = false;
+      return;
+    }
+
+    S.originalBytes = j.original_bytes || 0;
+    S.sttMs = j.stt_ms ?? null;
+    S.lastText = j.text || '';
+
+    document.getElementById('recognizedText').textContent = j.text;
+    document.getElementById('recognizedMeta').textContent =
+      'Original audio: ' + (j.original_kb ?? '?') + ' KB   ·   STT: ' +
+      (j.stt_ms != null ? j.stt_ms.toFixed(0) + ' ms' : 'NOT MEASURED');
+    document.getElementById('recognizedPanel').classList.remove('hidden');
+    document.getElementById('sentPanel').classList.add('hidden');
+
+    updateAnalytics();
+    updateLatencyFromLocal();
+    pttState.textContent = 'RECOGNIZED';
+    pttBtn.disabled = false;
+  } catch (e) {
+    pttState.textContent = 'NETWORK ERROR';
+    pttBtn.disabled = false;
+  }
+  audioInput.value = '';
+};
+
+// ------------------------------------------------------------------
+//  SEND
+// ------------------------------------------------------------------
+document.getElementById('sendBtn').onclick = () => {
+  if (!S.lastText) return;
+  sendPacket(S.lastText, false, false);
+};
+
+async function sendPacket(text, priority, demo) {
+  try {
+    const body = {
+      text: text,
+      language: S.language,
+      priority: !!priority,
+      demo: !!demo,
+      original_bytes: demo ? 0 : S.originalBytes,
+      stt_ms: demo ? null : S.sttMs,
+    };
+    const r = await fetch('/api/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    if (!j.ok) {
+      alert('Send failed: ' + (j.error || 'unknown'));
+      return;
+    }
+    const p = j.packet;
+    document.getElementById('pkBytes').textContent  = p.bytes + ' bytes';
+    document.getElementById('pkTime').textContent   = p.time_str;
+    document.getElementById('pkEngine').textContent = p.tts_engine || ('UNAVAILABLE (' + (p.tts_error || '') + ')');
+    document.getElementById('sentPanel').classList.remove('hidden');
+    document.getElementById('recognizedPanel').classList.add('hidden');
+
+    document.getElementById('anText').textContent = p.bytes + ' bytes';
+    document.getElementById('anAudio').textContent = p.original_kb ? (p.original_kb + ' KB') : 'DEMO (no audio)';
+    document.getElementById('anRed').textContent  = (j.reduction_pct != null) ? (j.reduction_pct + ' %') : '—';
+
+    // refresh latency shortly after, once the receiver has polled
+    setTimeout(refreshLatency, 1500);
+    setTimeout(refreshHistory, 500);
+    S.lastText = '';
+    S.originalBytes = 0;
+    S.sttMs = null;
+  } catch (e) {
+    alert('Network error while sending.');
+  }
+}
+
+document.getElementById('resetBtn').onclick = () => {
+  document.getElementById('sentPanel').classList.add('hidden');
+  document.getElementById('recognizedPanel').classList.add('hidden');
+  document.getElementById('pttState').textContent = 'READY';
+};
+
+// ------------------------------------------------------------------
+//  DEMO BUTTONS
+// ------------------------------------------------------------------
+document.querySelectorAll('.btn-demo').forEach(b => {
+  b.onclick = () => sendPacket(b.dataset.demo, false, true);
+});
+
+// ------------------------------------------------------------------
+//  ANALYTICS / LATENCY
+// ------------------------------------------------------------------
+function updateAnalytics() {
+  if (S.originalBytes && S.lastText) {
+    const tb = new Blob([S.lastText]).size;
+    document.getElementById('anAudio').textContent = (S.originalBytes / 1024).toFixed(2) + ' KB';
+    document.getElementById('anText').textContent  = tb + ' bytes';
+    const red = (1 - tb / S.originalBytes) * 100;
+    document.getElementById('anRed').textContent   = red.toFixed(2) + ' %';
+  }
+}
+function updateLatencyFromLocal() {
+  document.getElementById('ltStt').textContent = (S.sttMs != null ? S.sttMs.toFixed(0) + ' ms' : 'NOT MEASURED');
+}
+
+async function refreshLatency() {
+  try {
+    const r = await fetch('/api/latency');
+    const j = await r.json();
+    document.getElementById('ltStt').textContent   = j.stt_ms   != null ? j.stt_ms.toFixed(0)   + ' ms' : 'NOT MEASURED';
+    document.getElementById('ltNet').textContent   = j.net_ms   != null ? j.net_ms.toFixed(0)   + ' ms' : 'NOT MEASURED';
+    document.getElementById('ltTts').textContent   = j.tts_ms   != null ? j.tts_ms.toFixed(0)   + ' ms' : 'NOT MEASURED';
+    document.getElementById('ltTotal').textContent = j.total_ms != null ? j.total_ms.toFixed(0) + ' ms' : 'NOT MEASURED';
+    if (j.original_kb != null) document.getElementById('anAudio').textContent = j.original_kb + ' KB';
+    if (j.text_bytes  != null) document.getElementById('anText').textContent  = j.text_bytes + ' bytes';
+    if (j.reduction_pct != null) document.getElementById('anRed').textContent = j.reduction_pct + ' %';
+  } catch (e) {}
+}
+
+// ------------------------------------------------------------------
+//  HISTORY
+// ------------------------------------------------------------------
+async function refreshHistory() {
+  try {
+    const r = await fetch('/api/history?limit=25');
+    const j = await r.json();
+    if (!j.messages.length) { document.getElementById('history').textContent = '—'; return; }
+    document.getElementById('history').innerHTML =
+      '<div class="hist-row hist-head"><span>TIME</span><span>DEVICE</span><span>LANG</span><span>TEXT</span><span>PRIO</span></div>' +
+      j.messages.slice().reverse().map(m =>
+        '<div class="hist-row'+(m.type==='priority'?' prio':'')+'">' +
+          '<span>'+m.time_str+'</span>' +
+          '<span>'+m.sender+'</span>' +
+          '<span>'+m.language.toUpperCase()+'</span>' +
+          '<span class="hist-text">'+escapeHtml(m.text)+'</span>' +
+          '<span>'+(m.type==='priority'?'ALERT':'NORMAL')+'</span>' +
+        '</div>').join('');
+  } catch (e) {}
+}
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+setInterval(refreshHistory, 4000);
+setInterval(refreshLatency, 4000);
+refreshHistory();
+refreshLatency();
+</script>
+</body>
+</html>

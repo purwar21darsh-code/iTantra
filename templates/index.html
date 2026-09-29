@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>iTANTRA — Connect</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="center-page">
+<div class="scanlines"></div>
+
+<main class="device-select">
+  <div class="brand">
+    <div class="brand-mark">iTANTRA</div>
+    <div class="brand-sub">OFFLINE NEURAL TRANSCEIVER</div>
+    <div class="brand-sub2">SIH 2026 · PS-173 · LOCAL NODE</div>
+  </div>
+
+  <p class="hint">SELECT THE ROLE OF <b>THIS</b> PHONE</p>
+
+  <a class="role-btn role-a" href="/transmitter">
+    <span class="role-tag">PHONE A</span>
+    <span class="role-name">TRANSMITTER</span>
+    <span class="role-desc">SPEAK → OFFLINE STT → SEND TEXT PACKET</span>
+  </a>
+
+  <a class="role-btn role-b" href="/receiver">
+    <span class="role-tag">PHONE B</span>
+    <span class="role-name">RECEIVER</span>
+    <span class="role-desc">RECEIVE TEXT → OFFLINE TTS → PLAY AUDIO</span>
+  </a>
+
+  <div class="lang-status">
+    <div class="lang-status-title">LANGUAGE STATUS</div>
+    <div class="lang-status-body" id="langBody">loading…</div>
+  </div>
+
+  <div class="footnote">
+    LOCAL WI-FI ONLY · NO CLOUD · NO ACCOUNT · WORKS WITH INTERNET DISCONNECTED
+  </div>
+</main>
+
+<script>
+(async function () {
+  try {
+    const r = await fetch('/api/languages');
+    const j = await r.json();
+    document.getElementById('langBody').innerHTML = j.languages.map(l => {
+      const cls = l.stt === 'READY' ? 'ok' : 'no';
+      return '<div class="lang-row"><span>'+l.name+'</span>'+
+             '<span class="'+cls+'">'+l.stt+'</span></div>';
+    }).join('');
+  } catch (e) {
+    document.getElementById('langBody').textContent = 'LANGUAGE STATUS UNAVAILABLE';
+  }
+})();
+</script>
+</body>
+</html>

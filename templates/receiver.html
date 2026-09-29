@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>iTANTRA — Receiver</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="scanlines"></div>
+
+<header class="hud">
+  <div class="hud-left">
+    <div class="hud-title">iTANTRA</div>
+    <div class="hud-sub">OFFLINE TRANSCEIVER</div>
+  </div>
+  <div class="hud-right">
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">LINKING…</span></div>
+    <div class="hud-role">PHONE B · RECEIVER</div>
+  </div>
+</header>
+
+<main class="screen">
+
+  <div class="alert-banner hidden" id="alertBanner">PRIORITY ALERT</div>
+
+  <!-- ============ INCOMING ============ -->
+  <section class="panel incoming-panel" id="incomingPanel">
+    <div class="panel-title">INCOMING MESSAGE</div>
+    <div class="big-text" id="incomingText">—</div>
+    <div class="meta" id="incomingMeta"></div>
+    <div class="tts-state" id="ttsState">TTS PROCESSING…</div>
+    <audio id="audioPlayer" controls style="display:none;width:100%;margin-top:10px"></audio>
+    <button class="btn-primary big hidden" id="playBtn">PLAY MESSAGE</button>
+  </section>
+
+  <!-- ============ LATENCY ============ -->
+  <section class="panel">
+    <div class="panel-title">LATENCY</div>
+    <div class="kv"><span>STT</span><b id="ltStt">—</b></div>
+    <div class="kv"><span>Text Delivery</span><b id="ltNet">—</b></div>
+    <div class="kv"><span>TTS</span><b id="ltTts">—</b></div>
+    <div class="kv total"><span>TOTAL</span><b id="ltTotal">—</b></div>
+  </section>
+
+  <!-- ============ ANALYTICS ============ -->
+  <section class="panel">
+    <div class="panel-title">COMMUNICATION ANALYTICS</div>
+    <div class="kv"><span>Original Audio</span><b id="anAudio">—</b></div>
+    <div class="kv"><span>Transmitted Text</span><b id="anText">—</b></div>
+    <div class="kv"><span>Estimated Payload Reduction</span><b id="anRed">—</b></div>
+    <div class="note">Audio used locally for speech recognition. Inter-device communication payload is text.</div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section class="panel">
+    <div class="panel-title">MESSAGE HISTORY</div>
+    <div class="history" id="history">—</div>
+  </section>
+
+</main>
+
+<script>
+// ------------------------------------------------------------------
+const S = { lastSeq: 0, polling: false };
+
+// ------------------------------------------------------------------
+//  HEARTBEAT
+// ------------------------------------------------------------------
+async function heartbeat() {
+  try {
+    await fetch('/api/heartbeat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({device: 'phone_b', role: 'receiver'})
+    });
+    const r = await fetch('/api/status');
+    const j = await r.json();
+    setConnected(j.phone_a_connected && j.phone_b_connected, j.phone_a_connected);
+  } catch (e) { setConnected(false, false); }
+}
+function setConnected(aOK, bOK) {
+  const dot = document.querySelector('#status .dot');
+  const txt = document.getElementById('statusText');
+  if (aOK) {
+    dot.className = 'dot ok';
+    txt.textContent = 'CONNECTED';
+  } else if (bOK) {
+    dot.className = 'dot warn';
+    txt.textContent = 'WAITING FOR PHONE A';
+  } else {
+    dot.className = 'dot';
+    txt.textContent = 'LINKING…';
+  }
+}
+setInterval(heartbeat, 3000); heartbeat();
+
+// ------------------------------------------------------------------
+//  POLL FOR INCOMING MESSAGES
+// ------------------------------------------------------------------
+async function poll() {
+  if (S.polling) return;
+  S.polling = true;
+  try {
+    const r = await fetch('/api/incoming?since=' + S.lastSeq);
+    const j = await r.json();
+    if (j.messages && j.messages.length) {
+      for (const m of j.messages) {
+        displayMessage(m);
+        S.lastSeq = Math.max(S.lastSeq, m.seq);
+      }
+      refreshHistory();
+      refreshLatency();
+    }
+  } catch (e) {}
+  S.polling = false;
+}
+setInterval(poll, 900);
+
+// ------------------------------------------------------------------
+//  DISPLAY A RECEIVED MESSAGE
+// ------------------------------------------------------------------
+const audioPlayer = document.getElementById('audioPlayer');
+const playBtn     = document.getElementById('playBtn');
+
+function displayMessage(m) {
+  document.getElementById('incomingText').textContent = m.text;
+  const metaBits = [];
+  metaBits.push(m.time_str + ' · PHONE A · ' + m.language.toUpperCase());
+  if (m.demo) metaBits.push('DEMO / FALLBACK');
+  if (m.net_ms != null) metaBits.push('delivery ' + m.net_ms.toFixed(0) + ' ms');
+  document.getElementById('incomingMeta').textContent = metaBits.join('   ·   ');
+
+  const banner = document.getElementById('alertBanner');
+  if (m.type === 'priority') banner.classList.remove('hidden');
+  else                        banner.classList.add('hidden');
+
+  const ttsState = document.getElementById('ttsState');
+  const panel    = document.getElementById('incomingPanel');
+
+  if (!m.audio_url) {
+    ttsState.textContent = 'TTS UNAVAILABLE — ' + (m.tts_error || '');
+    ttsState.className = 'tts-state err';
+    audioPlayer.style.display = 'none';
+    playBtn.classList.add('hidden');
+    return;
+  }
+
+  ttsState.textContent = 'TTS PROCESSING…';
+  ttsState.className = 'tts-state';
+  playBtn.classList.add('hidden');
+  audioPlayer.style.display = 'none';
+
+  // Load the offline-generated audio
+  audioPlayer.src = m.audio_url + '?t=' + Date.now();
+  audioPlayer.load();
+
+  // Try autoplay (may be blocked — then we show the big PLAY button)
+  audioPlayer.style.display = 'block';
+  const p = audioPlayer.play();
+  if (p && p.catch) {
+    p.then(() => {
+      ttsState.textContent = 'PLAYING';
+      ttsState.className = 'tts-state ok';
+    }).catch(() => {
+      ttsState.textContent = 'AUTOPLAY BLOCKED';
+      ttsState.className = 'tts-state warn';
+      playBtn.classList.remove('hidden');
+    });
+  } else {
+    ttsState.textContent = 'PLAYING';
+    ttsState.className = 'tts-state ok';
+  }
+  panel.classList.add('incoming-active');
+  setTimeout(() => panel.classList.remove('incoming-active'), 900);
+}
+
+playBtn.onclick = () => {
+  audioPlayer.play().then(() => {
+    document.getElementById('ttsState').textContent = 'PLAYING';
+    document.getElementById('ttsState').className = 'tts-state ok';
+    playBtn.classList.add('hidden');
+  }).catch(()=>{});
+};
+audioPlayer.onended = () => {
+  document.getElementById('ttsState').textContent = 'PLAYBACK COMPLETE';
+  document.getElementById('ttsState').className = 'tts-state ok';
+};
+
+// ------------------------------------------------------------------
+//  LATENCY & ANALYTICS
+// ------------------------------------------------------------------
+async function refreshLatency() {
+  try {
+    const r = await fetch('/api/latency');
+    const j = await r.json();
+    document.getElementById('ltStt').textContent   = j.stt_ms   != null ? j.stt_ms.toFixed(0)   + ' ms' : 'NOT MEASURED';
+    document.getElementById('ltNet').textContent   = j.net_ms   != null ? j.net_ms.toFixed(0)   + ' ms' : 'NOT MEASURED';
+    document.getElementById('ltTts').textContent   = j.tts_ms   != null ? j.tts_ms.toFixed(0)   + ' ms' : 'NOT MEASURED';
+    document.getElementById('ltTotal').textContent = j.total_ms != null ? j.total_ms.toFixed(0) + ' ms' : 'NOT MEASURED';
+    document.getElementById('anAudio').textContent = j.original_kb != null ? j.original_kb + ' KB' : '—';
+    document.getElementById('anText').textContent  = j.text_bytes  != null ? j.text_bytes + ' bytes' : '—';
+    document.getElementById('anRed').textContent   = j.reduction_pct != null ? j.reduction_pct + ' %' : '—';
+  } catch (e) {}
+}
+
+// ------------------------------------------------------------------
+//  HISTORY
+// ------------------------------------------------------------------
+async function refreshHistory() {
+  try {
+    const r = await fetch('/api/history?limit=25');
+    const j = await r.json();
+    if (!j.messages.length) { document.getElementById('history').textContent = '—'; return; }
+    document.getElementById('history').innerHTML =
+      '<div class="hist-row hist-head"><span>TIME</span><span>DEVICE</span><span>LANG</span><span>TEXT</span><span>PRIO</span></div>' +
+      j.messages.slice().reverse().map(m =>
+        '<div class="hist-row'+(m.type==='priority'?' prio':'')+'">' +
+          '<span>'+m.time_str+'</span>' +
+          '<span>'+m.sender+'</span>' +
+          '<span>'+m.language.toUpperCase()+'</span>' +
+          '<span class="hist-text">'+escapeHtml(m.text)+'</span>' +
+          '<span>'+(m.type==='priority'?'ALERT':'NORMAL')+'</span>' +
+        '</div>').join('');
+  } catch (e) {}
+}
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+refreshLatency();
+refreshHistory();
+setInterval(refreshLatency, 4000);
+</script>
+</body>
+</html>

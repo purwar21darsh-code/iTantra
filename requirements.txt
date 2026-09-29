@@ -1,0 +1,9 @@
+Flask==3.0.3
+Werkzeug==3.0.3
+qrcode[pil]==7.4.2
+Pillow==10.4.0
+vosk==0.3.45
+pyttsx3==2.90
+imageio-ffmpeg==0.5.1
+gunicorn==22.0.0
+gunicorn==22.0.0
